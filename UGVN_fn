@@ -1,0 +1,59 @@
+function [ Yout Energy WorkSpace ] = UGVN_fn( World,WorkSpace,h,E,testPoint,prevPoint,targetPoint )
+
+Neighborhood=zeros(size(h+1));
+for i=-h:h
+    for j=-h:h
+        Neighborhood(i+(h+1),j+(h+1))=WorkSpace(testPoint(1)+i,testPoint(2)+j);
+    end
+end
+
+prevPoint;
+P1=WorkSpace(testPoint(1)-h,testPoint(2)-h); % node 1
+P2=WorkSpace(testPoint(1)-h,testPoint(2)); % node 2
+P3=WorkSpace(testPoint(1)-h,testPoint(2)+h); % node 3
+P4=WorkSpace(testPoint(1),testPoint(2)-h); % node 4
+P5=WorkSpace(testPoint(1),testPoint(2)); % node 5
+P6=WorkSpace(testPoint(1),testPoint(2)+h); % node 6
+P7=WorkSpace(testPoint(1)+h,testPoint(2)-h); % node 7
+P8=WorkSpace(testPoint(1)+h,testPoint(2)); % node 8
+P9=WorkSpace(testPoint(1)+h,testPoint(2)+h); % node 9
+ds1=norm([P5,P1]); % magnitude vector of Pi.j to Pi-1.j+1 (P5 to P1)
+ds2=norm([P9,P5]); % magnitude vector of Pi+1.j-1 to Pi.j (P9 to P5)
+du1=norm([P5,P6]); % magnitude vector of Pi.j to Pi+1.j (P5 to P6)
+du2=norm([P4,P5]); % magnitude vector of Pi-1.1 to Pi.j (P4 to P5)
+dw1=norm([P5,P2]); % magnitude vector of Pi.j to Pi.j+1 (P5 to P2)
+dw2=norm([P8,P5]); % magnitude vector of Pi.j-1 to Pi.j (P8 to P5)
+dq1=norm([P5,P9]); % magnitude vector of Pi.j to Pi+1.j+1 (P5 to P9)
+dq2=norm([P1,P5]); % magnitude vector of Pi-1.j-1 to Pi.j (P1 to P5)
+A=2*h*[(1/(ds1*(ds2+ds1))) (1/(dw1*(dw2+dw1))) (1/(dq1*(dq2+dq1))) ;
+    (1/(du2*(du2+du1))) 1 (1/(du1*(du2+du1))) ;
+    (1/(dq2*(dq2+dq1))) (1/(dw2*(dw2+dw1))) (1/(ds2*(ds2+ds1)))];
+Neighborhood=Neighborhood.*A;
+% Neighborhood=del2(Neighborhood);
+WorkSpace=WorkSpace(:);
+unitMat=~eye(length(WorkSpace));
+W=WorkSpace'*WorkSpace;
+W=W.*unitMat;
+for i=-h:h
+    for j=-h:h
+        if World((testPoint(1)+i),(testPoint(2)+j))==0
+            Neighborhood((i+(h+1)),(j+(h+1)))=0;
+        end
+    end
+end
+Ytest=zeros(length(World));
+for i=-1:1
+    for j=-1:1
+        Ytest((testPoint(1)+i),(testPoint(2)))=Neighborhood((i+(h+1)),(j+(h+1)));
+    end
+end
+Ytest=Ytest(:);
+out=WorkSpace'-(Ytest'*W);
+out=reshape(out,size(zeros(sqrt(length(out)))));
+out(targetPoint(1),targetPoint(2))=out(targetPoint(1),targetPoint(2))+E;
+Energy=(-1/2)*((Ytest'*W)*Ytest);
+Yout=sum(sum(out));
+WorkSpace=reshape(WorkSpace,size(zeros(sqrt(length(WorkSpace)))))+(out.*World);
+WorkSpace=WorkSpace(:);
+
+end
