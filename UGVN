@@ -1,0 +1,362 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%	Name: 	Eng. Turky Abdulaziz Abdulhafiz Saderaldin
+%	
+%   Term Project
+%   Title ( Robot Path Planning Using Hopfield Neural Network )
+%
+%   Description:
+%   The source code divided into two parts, first part is the
+%   function ( UGVN_fn.m ) which is the implementation of the
+%   local activity calculation as mentioned in the paper, 
+%   second part is the path planning algorithm for the robot
+%
+%   Usage:
+%   The application is very simple and straight forward, only
+%   run the code and it will gives you a grid to design your
+%   test. Start by setting the target using the mouse ( avoid 
+%   edges because it is already considered outside the free 
+%   workspace ), after that draw the obstacles by using left-button
+%   of the mouse, to finish drawing the obstacle use mouse
+%   right click. Finally, set the start point of the robot and
+%   the program will take you to the next step. use F5 button
+%   to run the program step-by-step. Once the robot make it to
+%   the target the results and graph will appear. 
+%
+%
+%   For questions or suggestions please feel free to contact me at
+%   eng.tg@ieee.org 
+%
+%   Enjoy,
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+close all
+clear all
+clc
+
+%%%%%%%%%%% Start of Interactive map routine %%%%%%%%%%%%
+MAX_X=10;
+MAX_Y=10;
+World=(ones(MAX_X,MAX_Y));
+World(:,1)=0;
+World(:,10)=0;
+World(1,:)=0;
+World(10,:)=0;
+% World(:,1)=0;
+
+% Obtain Obstacle, Target and Robot Position
+% Initialize the World with input values
+% Obstacle=0,Target=1,Robot=1,Space=1
+j=0;
+x_val = 1;
+y_val = 1;
+axis([1 MAX_X+1 1 MAX_Y+1])
+camroll(-90);
+set(gca,'XTick',1:1:MAX_X,'YTick',1:1:MAX_Y,'YTickLabel','','XTickLabel','');
+grid on;
+hold on;
+n=0;%Number of Obstacles
+
+
+but=0;
+while (but ~= 1) %Repeat until the Left button is not clicked
+    [xval,yval,but]=ginput(1);
+end
+xval=floor(xval);
+yval=floor(yval);
+xTarget=xval;%X Coordinate of the Target
+yTarget=yval;%Y Coordinate of the Target
+targetPoint=[xTarget yTarget];
+World(xval,yval)=1;%Initialize World with location of the target
+plot(xval+.5,yval+.5,'bx','LineWidth',20);
+text(xval+1,yval+.5,'Target')
+
+
+while but == 1
+    [xval,yval,but] = ginput(1);
+    xval=floor(xval);
+    yval=floor(yval);
+    World(xval,yval)=0;%Put on the closed list as well
+    plot(xval+.5,yval+.5,'blacks','LineWidth',25);
+ end%End of While loop
+
+
+ 
+but=0;
+while (but ~= 1) %Repeat until the Left button is not clicked
+    [xval,yval,but]=ginput(1);
+    xval=floor(xval);
+    yval=floor(yval);
+end
+xStart=xval;%Starting Position
+yStart=yval;%Starting Position
+startPoint=[xStart yStart];
+World(xval,yval)=1;
+ plot(xval+.5,yval+.5,'ro','LineWidth',15);
+%End of obstacle-Target pickup
+close all
+%%%%%%%%%%% End of Interactive map routine %%%%%%%%%%%%
+
+
+%% Program    
+WorkSpace=World;
+h=1;
+E=1;
+
+
+currentPoint=startPoint;
+prevPoint=currentPoint;
+robotPath_x=[];
+robotPath_y=[];
+Energy=[];
+[Yout Energy WorkSpace1]=UGVN_fn(World,WorkSpace,h,E,currentPoint,prevPoint,targetPoint);
+con=1;
+% keyboard
+while con
+
+% WorkSpace=reshape(WorkSpace,size(zeros(sqrt(length(WorkSpace)))));
+clear validLocalPoints_x validLocalPoints_y validLocalPoints Yvalid Ymax tmpEnergy
+validLocalPoints_x=[];
+validLocalPoints_y=[];
+tmpEnergy=[];
+Yvalid=[];
+for i=-h:h
+    for j=-h:h
+        if World(currentPoint(1)+i,currentPoint(2)+j)~=0 && i~=0 | j~=0 && currentPoint(1)+i~=prevPoint(1) | currentPoint(2)+j~=prevPoint(2) 
+            validLocalPoints_x=[validLocalPoints_x i+(h+1)];
+            validLocalPoints_y=[validLocalPoints_y j+(h+1)];
+        end
+    end
+end
+validLocalPoints=[validLocalPoints_x' validLocalPoints_y']; 
+% keyboard
+for i=1:length(validLocalPoints_x)
+    testPoint=[currentPoint(1)+(validLocalPoints(i,1)-(h+1)) currentPoint(2)+(validLocalPoints(i,2)-(h+1))];
+    [Yout tmpE dumpWorkSpace1]=UGVN_fn(World,WorkSpace,h,E,testPoint,prevPoint,targetPoint);
+    Yvalid=[Yvalid Yout];
+    tmpEnergy=[tmpEnergy tmpE];
+end
+
+[min_D min_Dind]=min(sqrt((((currentPoint(1)+(validLocalPoints(:,1)-(h+1)))-targetPoint(1)).^2)+(((currentPoint(2)+(validLocalPoints(:,2)-(h+1)))-targetPoint(2)).^2)));
+                  Ymax_ind=min_Dind;
+Energy=[Energy tmpEnergy(Ymax_ind)];
+robotPath_x=[robotPath_x currentPoint(1)];
+robotPath_y=[robotPath_y currentPoint(2)];
+prevPoint=currentPoint;
+if length(robotPath_x)>3
+    for i=length(robotPath_x)-3:length(robotPath_x)
+        for j=length(robotPath_y)-3:length(robotPath_y)
+            if (currentPoint(1)+(validLocalPoints(Ymax_ind,1)-(h+1)))==robotPath_x(i) && (currentPoint(2)+(validLocalPoints(Ymax_ind,2)-(h+1)))==robotPath_y(j)
+                [Ymax Ymax_ind]=find(Yvalid==max(Yvalid),1,'last');
+                
+%                   Ymax_ind=randi([1 length(Yvalid)],1,1);
+            end
+            if (currentPoint(1)+(validLocalPoints(Ymax_ind,1)-(h+1)))==robotPath_x(i) && (currentPoint(2)+(validLocalPoints(Ymax_ind,2)-(h+1)))==robotPath_y(j)
+%                 [Ymax Ymax_ind]=find(Yvalid==max(Yvalid),1,'first');
+%                   Ymax_ind=randi([1 length(Yvalid)],1,1);
+                  [Ymax Ymax_ind]=find(Yvalid==min(Yvalid),1,'first');
+            end
+        end
+    end
+    
+end
+
+imshow(World,'InitialMagnification', 'fit');
+hold on
+plot(targetPoint(2),targetPoint(1),'bx','LineWidth',5,'MarkerSize',20,'MarkerFaceColor','blue');
+hold on
+plot(currentPoint(2),currentPoint(1),'ro','MarkerSize',15,'MarkerFaceColor','red');
+hold off
+
+
+currentPoint(1)=currentPoint(1)+(validLocalPoints(Ymax_ind,1)-(h+1));
+currentPoint(2)=currentPoint(2)+(validLocalPoints(Ymax_ind,2)-(h+1));
+[dumpYout E tmpWorkSpace]=UGVN_fn(World,WorkSpace,h,E,currentPoint,prevPoint,targetPoint);
+clear dumpYout dumpE dumpWorkSpace
+WorkSpace2=reshape(tmpWorkSpace,size(zeros(sqrt(length(tmpWorkSpace)))));
+WorkSpace2(targetPoint(1),targetPoint(2))=WorkSpace2(targetPoint(1),targetPoint(2))+E;
+% for i=1:length(robotPath_x)
+%         WorkSpace2(robotPath_x(i),robotPath_y(i))=WorkSpace2(robotPath_x(i),robotPath_y(i))-1;
+%     end
+% currentPoint
+
+if currentPoint(1)==targetPoint(1) & currentPoint(2)==targetPoint(2)
+    con=0;
+end
+
+keyboard   % to run the program step-by-step
+end
+WorkSpace2=abs(WorkSpace2);
+imshow(World,'InitialMagnification', 'fit');
+hold on
+plot(targetPoint(2),targetPoint(1),'bx','LineWidth',5,'MarkerSize',20,'MarkerFaceColor','blue');
+hold on
+plot(currentPoint(2),currentPoint(1),'ro','MarkerSize',15,'MarkerFaceColor','red');
+hold off
+
+%% Showing Results
+
+robotPath=[robotPath_x' robotPath_y']
+Energy'
+
+%% Plotting Results
+
+%% first surface separate figure
+scrsz=get(0,'ScreenSize');
+figure('Name','Activity Landscape Mesh','Position',[scrsz(3)/4 scrsz(4)/4 scrsz(3)/2 scrsz(4)/2]);
+hSurface=mesh(WorkSpace2,'EdgeColor','black');
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+set(hSurface,'FaceColor',[0.3 0.4 0.6],'FaceAlpha',0.1);
+% colormap hsv
+% colorbar
+light;
+camlight right; 
+lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(25,55)
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('Mesh','FontSize',12.5,'FontWeight','bold');
+
+
+%% second surface separate figure
+scrsz=get(0,'ScreenSize');
+figure('Name','Activity Landscape XZ','Position',[scrsz(3)/4 scrsz(4)/4 scrsz(3)/2 scrsz(4)/2]);
+hSurface=surf(WorkSpace2);
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+set(hSurface,'FaceColor',[0.8 1 0],'FaceAlpha',0.2);
+% colormap hsv
+% colorbar
+light;
+camlight left; 
+lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(0,0);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('XZ','FontSize',12.5,'FontWeight','bold');
+% light;
+% lighting phong;
+% camlight('left');
+% shading interp;
+
+
+%% Third surface separate figure
+scrsz=get(0,'ScreenSize');
+figure('Name','Activity Landscape XY','Position',[scrsz(3)/4 scrsz(4)/4 scrsz(3)/2 scrsz(4)/2]);
+hSurface=surf(WorkSpace2);
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+% set(hSurface,'FaceColor',[0.6 1 0],'FaceAlpha',0.2);
+colorbar
+light;
+camlight left; 
+lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(2);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('XY','FontSize',12.5,'FontWeight','bold');
+
+
+%% Fourth surface separate figure
+scrsz=get(0,'ScreenSize');
+figure('Name','Activity Landscape 3D','Position',[scrsz(3)/4 scrsz(4)/4 scrsz(3)/2 scrsz(4)/2]);
+hSurface=surf(WorkSpace2,'EdgeColor','none');
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+% set(hSurface,'FaceColor',[0.6 1 0],'FaceAlpha',0.2);
+colormap hsv
+colorbar
+light;
+camlight right; 
+
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(-15,65);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('3D','FontSize',12.5,'FontWeight','bold');
+light;
+lighting phong;
+shading interp;
+
+
+
+%% first surface
+scrsz=get(0,'ScreenSize');
+figure('Name','Activity Landscape','Position',[scrsz(3)/4 scrsz(4)/4 scrsz(3)/2 scrsz(4)/2]);
+subplot(2,2,1);
+hSurface=mesh(WorkSpace2,'EdgeColor','black');
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+set(hSurface,'FaceColor',[0.3 0.4 0.6],'FaceAlpha',0.1);
+% colormap hsv
+% colorbar
+light;
+camlight right; 
+lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(25,55)
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('Mesh','FontSize',12.5,'FontWeight','bold');
+
+%% second surface
+subplot(2,2,2);
+hSurface=surf(WorkSpace2);
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+set(hSurface,'FaceColor',[0.8 1 0],'FaceAlpha',0.2);
+% colormap hsv
+% colorbar
+light;
+camlight left; 
+lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(0,0);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('XZ','FontSize',12.5,'FontWeight','bold');
+% light;
+% lighting phong;
+% camlight('left');
+% shading interp;
+
+
+%% Third surface
+subplot(2,2,3);
+hSurface=surf(WorkSpace2);
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+% set(hSurface,'FaceColor',[0.6 1 0],'FaceAlpha',0.2);
+% colorbar
+% light;
+% camlight left; 
+% lighting phong;
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(2);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('XY','FontSize',12.5,'FontWeight','bold');
+
+
+%% Fourth surface
+subplot(2,2,4);
+hSurface=surf(WorkSpace2,'EdgeColor','none');
+% axis([0 length(World) 0 length(World) 0 WorkSpace2(targetPoint(1),targetPoint(2))]);
+% set(hSurface,'FaceColor',[0.6 1 0],'FaceAlpha',0.2);
+colormap hsv
+colorbar
+light;
+camlight right; 
+
+% set(gca,'xlim',[0 length(World)],'ylim',[0 length(World)]);
+view(-15,65);
+xlabel('X');
+ylabel('Y');
+zlabel('Activity');
+title('3D','FontSize',12.5,'FontWeight','bold');
+light;
+lighting phong;
+shading interp;
